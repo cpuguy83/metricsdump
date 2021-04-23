@@ -23,7 +23,10 @@ func main() {
 	if ns == "" {
 		ns = "k8s.io"
 	}
+
+	forceVersion := os.Getenv("CONTAINERD_METRICS_TYPE_URL")
 	flag.StringVar(&addr, "addr", addr, "task ttrpc address")
+	flag.StringVar(&forceVersion, "metrics-type-url", forceVersion, "force decode with metrics with different type url")
 
 	flag.Parse()
 
@@ -59,6 +62,12 @@ func main() {
 		os.Exit(2)
 	}
 
+	if forceVersion != "" {
+		actual := getActualURL(forceVersion)
+		fmt.Fprintln(os.Stderr, "Updating metrics type url from", metrics.Data.TypeUrl, "to", actual)
+		metrics.Data.TypeUrl = actual
+	}
+
 	anydata, err := typeurl.UnmarshalAny(metrics.Data)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error unmarshalling metrics data for type %q: %v\n", metrics.Data.TypeUrl, err)
@@ -70,5 +79,16 @@ func main() {
 	if err := json.NewEncoder(os.Stdout).Encode(anydata); err != nil {
 		fmt.Fprintf(os.Stderr, "Error marshalling metrics data to json: %v\n", err)
 		os.Exit(3)
+	}
+}
+
+func getActualURL(s string) string {
+	switch s {
+	case "v1":
+		return "io.containerd.cgroups.v1.Metrics"
+	case "v2":
+		return "io.containerd.cgroups.v2.Metrics"
+	default:
+		return s
 	}
 }
